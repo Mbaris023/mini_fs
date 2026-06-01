@@ -17,7 +17,7 @@ static bool stop_logger = false;
 static pthread_t logger_thread_id;
 static FILE *log_file = NULL;
 
-static void* logger_thread_func(void* arg) {
+static void* logger_thread_func(void* arg __attribute__((unused))) {
     log_file = fopen(LOG_FILE, "a");
     if (!log_file) return NULL;
     
@@ -46,7 +46,7 @@ static void* logger_thread_func(void* arg) {
     return NULL;
 }
 
-int logger_init() {
+int logger_init(void) {
     stop_logger = false;
     log_head = 0;
     log_tail = 0;
@@ -58,7 +58,7 @@ int logger_init() {
     return 0;
 }
 
-void logger_cleanup() {
+void logger_cleanup(void) {
     pthread_mutex_lock(&log_mutex);
     stop_logger = true;
     pthread_cond_signal(&log_cond);

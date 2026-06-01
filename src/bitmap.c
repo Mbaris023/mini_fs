@@ -5,7 +5,7 @@
 extern Superblock sb;
 static uint8_t *bitmap = NULL;
 
-int bitmap_init() {
+int bitmap_init(void) {
     uint32_t bitmap_bytes = sb.bitmap_blocks * sb.block_size;
     bitmap = (uint8_t *)malloc(bitmap_bytes);
     if (!bitmap) return -1;
@@ -48,7 +48,7 @@ int bitmap_free_block(uint32_t block_num) {
     return 0;
 }
 
-void bitmap_sync() {
+void bitmap_sync(void) {
     if (!bitmap) return;
     for (uint32_t i = 0; i < sb.bitmap_blocks; i++) {
         disk_write(sb.bitmap_start + i, bitmap + (i * sb.block_size));

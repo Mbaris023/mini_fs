@@ -11,7 +11,16 @@ Bu proje tek bir binary dosya üzerinde çalışan basit bir dosya sistemi simü
 - **block layout:** Veri blokları, bitmap ve inode kısımlarından sonra gelir ve asıl veriyi depolar. Sırasıyla Superblock -> Bitmap -> Inode -> Data Blocks düzenindedir.
 
 ### CLI komutları
-Sistem terminal üzerinden şu komutlar ile kontrol edilebilir: `format`, `create`, `write`, `read`, `ls`, `rm`, `statfs`.
+Sistem terminal üzerinden şu komutlar ile kontrol edilebilir: `format`, `create`, `write`, `append`, `read`, `rename`, `cp`, `chmod`, `truncate`, `ls`, `rm`, `stat`, `statfs`, `fsck`, `perf`.
+
+### Web Arayüzü (UI) Simülatörü
+Proje içerisine `ui/` dizininde, dosya sisteminin çalışma mantığını görselleştiren web tabanlı bir simülatör entegre edilmiştir. `ui/index.html` dosyasını bir tarayıcıda açarak:
+- Dosyalar oluşturabilir, silebilir ve içeriklerini düzenleyebilirsiniz.
+- Sanal diskin (Superblock, Bitmap, Inode ve Data bloklarının) anlık durumunu görsel bir harita üzerinde takip edebilirsiniz.
+- C mimarisindeki senkronizasyon ve veri yapılarına dokunmadan, tüm işlemleri görsel bir eğitim aracı olarak deneyimleyebilirsiniz.
+
+### Performans Ölçümü
+Projeye nanosaniye hassasiyetinde hız ölçümleri yapabilen `perf.c` modülü eklenmiştir. `CLOCK_MONOTONIC` saati kullanılarak C çekirdeğinde yapılan dosya okuma, yazma ve silme işlemlerinin süreleri kaydedilir ve `mini_fs perf` komutu ile terminale raporlanır.
 
 ### logger thread mimarisi
 Arka planda bağımsız bir logger thread çalışır. Loglama mesajları thread-safe (senkron) bir kuyruğa eklenir ve logger thread uyanarak bunları diske asenkron yazar. Böylece ana işlem yavaşlamaz.
@@ -27,12 +36,20 @@ Arka planda bağımsız bir logger thread çalışır. Loglama mesajları thread
 ## Çalıştırma Adımları
 ```bash
 make
-./mini_fs format 1024 256
+./mini_fs format 102400 512
 ./mini_fs create test.txt
 ./mini_fs write test.txt "hello"
 ./mini_fs read test.txt
 ./mini_fs ls
 ./mini_fs statfs
+./mini_fs perf
+```
+
+### Otomatik Testler
+Sistemi test etmek veya bellek sızıntılarını denetlemek için şu komutları kullanabilirsiniz:
+```bash
+make test       # Test senaryolarını otomatik çalıştırır
+make valgrind   # Valgrind ile bellek sızıntısı kontrolü yapar
 ```
 
 ## Testler

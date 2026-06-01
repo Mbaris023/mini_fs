@@ -54,7 +54,7 @@ int disk_write(uint32_t block_num, const void *buffer) {
     return 0;
 }
 
-void disk_close() {
+void disk_close(void) {
     if (disk_fd >= 0) {
         close(disk_fd);
         disk_fd = -1;

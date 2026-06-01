@@ -49,6 +49,9 @@ Sistem verilerini RAM yerine `virtual_disk.bin` dosyasına kalıcı olarak yazar
 - **Inode Tablosu:** Her dosyanın metadata'sını barındırır. Projede karmaşık ağaç (tree) dizin mimarisi yerine tek seviyeli (single-level) dizin mimarisi benimsenmiştir. Dosya adı, boyutu ve diskin hangi veri bloklarına yazıldığını gösteren *direct blocks* (doğrudan blok pointer'ları) Inode içerisinde tutulur.
 - **Veri Blokları (Data Blocks):** Kullanıcıların dosyaya yazdıkları fiili verilerin (string, byte dizisi) diske kaydedildiği bloklardır.
 
+### 2.2. Web Arayüzü (UI) Simülatörü
+Proje mimarisine, dosya sistemi bloklarını ve çalışma mantığını görselleştiren, C kodlarından bağımsız web tabanlı bir simülatör (`ui/index.html`) dahil edilmiştir. Bu arayüz doğrudan C kodunun bellek, thread ve mutex yapısını etkilemeden eğitim ve görselleştirme amacı taşımaktadır.
+
 ## 3. Dosya Yapısı ve Kaynak Kod Modülleri
 Proje, modülerliği ve kod okunabilirliğini sağlamak amacıyla farklı görevleri üstlenen C ve Header dosyalarına ayrılmıştır:
 
@@ -59,6 +62,9 @@ Proje, modülerliği ve kod okunabilirliğini sağlamak amacıyla farklı görev
 - **`src/inode.c`:** Inode tablosunun yönetimini sağlar. İsme göre Inode arama (`inode_find_by_name`), yeni inode tahsis etme (`inode_allocate`) ve inode'ları serbest bırakma işlevlerini gerçekleştirir.
 - **`src/bitmap.c`:** Bellek optimizasyonlu boş blok yönetimini üstlenir. İlgili bitleri 1 veya 0 yaparak diskin neresinin dolu, neresinin boş olduğunu hesaplar (`bitmap_allocate_block`, `bitmap_free_block`).
 - **`src/logger.c`:** Asenkron loglama sistemini içerir. Arka planda çalışan bir `pthread` oluşturur, konsola yazılan işlem özetlerini `fs.log` dosyasına kaydeder.
+- **`src/perf.c` & `include/perf.h`:** C çekirdeğinde çalışan sistem fonksiyonlarının çalışma sürelerini nanosaniye hassasiyetinde (`CLOCK_MONOTONIC`) ölçen ve raporlayan performans izleme modülüdür.
+- **`ui/` (Web Simülatörü):** Projenin görselleştirilmesi için eklenen web tabanlı (HTML/JS/CSS) kullanıcı arayüzü dosyalarını barındırır.
+- **`tests/`:** Sistemin test edilmesini otomatikleştiren bağımsız bash script'lerini (`test_suite.sh`, `test_stress.sh` vb.) barındırır.
 
 ## 4. Kullanılan Sistem Programlama Kavramları
 
@@ -84,7 +90,8 @@ Dosya sistemi terminal üzerinden argümanlarla çalışır:
 - **`./mini_fs statfs`:** Sistemin kapasitesini (boş/dolu blok sayılarını) ve Superblock haritasını döker.
 
 ## 6. Performans Değerlendirmesi
-Projenin performans ölçümü için `tests/performance_test.sh` betiği hazırlanmıştır. 
+Projenin performans ölçümü için `tests/performance_test.sh` betiği ve sistemin içerisine yerleştirilmiş `perf.c` modülü kullanılmaktadır. 
+- **Nanosaniye Hassasiyetinde Ölçüm:** `CLOCK_MONOTONIC` saati kullanılarak dosya oluşturma, okuma, yazma ve silme gibi her bir dosya sistemi operasyonunun gecikme süresi `g_perf` yapısına kaydedilmekte ve terminalden (`./mini_fs perf`) raporlanabilmektedir.
 - **I/O Gecikmesi ve Erişim Süresi:** Metadata'nın bellek seviyesinde modellenip ofsetlerle hızlıca disk dosyasına yansıtılması sayesinde `ls`, `read` gibi işlemler milisaniyeler içerisinde (0.001s altında) tepki vermektedir.
 - **Thread Etkisi:** Asenkron Logger mimarisi sayesinde log I/O'su ana process'i bloke etmez. Büyük verilerin ardışık döngülerle yazılması durumunda dahi uygulamanın çalışma ("real" süresi) hızında gözle görülür bir I/O darboğazı yaşanmamaktadır.
 

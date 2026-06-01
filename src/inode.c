@@ -4,7 +4,7 @@
 
 extern Superblock sb;
 
-int inode_init_table() {
+int inode_init_table(void) {
     return 0; 
 }
 

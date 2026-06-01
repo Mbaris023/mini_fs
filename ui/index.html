@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>mini_fs — Dosya Sistemi Simülatörü</title>
+  <meta name="description" content="POSIX tabanlı mini dosya sistemi simülatörü — sistem programlama projesi"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body class="dark-mode">
+
+<!-- ====== HEADER ====== -->
+<header class="app-header" id="appHeader">
+  <div class="header-left">
+    <div class="logo" id="logoBtn" onclick="showAboutModal()" title="Proje Hakkında">
+      <span class="logo-hex">⬡</span>
+      <span class="logo-name">mini<span class="logo-accent">_fs</span></span>
+    </div>
+    <div class="header-tags">
+      <span class="tag tag-lang">C · POSIX</span>
+      <span class="tag tag-feature">pthread</span>
+      <span class="tag tag-feature">pread/pwrite</span>
+      <span class="tag tag-version">v2.0</span>
+    </div>
+  </div>
+
+  <div class="header-center">
+    <div class="disk-status" id="diskStatus">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">Disk bulunamadı — format gerekli</span>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <div class="stat-group">
+      <div class="stat-item" id="statBlocks">
+        <span class="stat-icon">▦</span>
+        <div class="stat-body">
+          <span class="stat-label">Bloklar</span>
+          <span class="stat-val" id="svBlocks">—</span>
+        </div>
+      </div>
+      <div class="stat-item" id="statInodes">
+        <span class="stat-icon">⊞</span>
+        <div class="stat-body">
+          <span class="stat-label">İnodlar</span>
+          <span class="stat-val" id="svInodes">—</span>
+        </div>
+      </div>
+      <div class="stat-item" id="statFiles">
+        <span class="stat-icon">📄</span>
+        <div class="stat-body">
+          <span class="stat-label">Dosyalar</span>
+          <span class="stat-val" id="svFiles">0</span>
+        </div>
+      </div>
+      <div class="stat-item" id="statOps">
+        <span class="stat-icon">⚡</span>
+        <div class="stat-body">
+          <span class="stat-label">Op/süre</span>
+          <span class="stat-val" id="svPerf">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="hbtn" onclick="toggleTheme()" title="Tema değiştir" id="themeBtn">☀</button>
+      <button class="hbtn" onclick="showShortcuts()" title="Kısayollar (?)">?</button>
+    </div>
+  </div>
+</header>
+
+<!-- ====== MAIN LAYOUT ====== -->
+<div class="app-body">
+
+  <!-- LEFT: Terminal -->
+  <aside class="panel panel-terminal" id="panelTerminal">
+    <div class="panel-titlebar">
+      <div class="titlebar-dots">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-yellow"></span>
+        <span class="dot dot-green"></span>
+      </div>
+      <span class="titlebar-label">Terminal</span>
+      <div class="titlebar-actions">
+        <button class="tbtn" onclick="clearTerminal()" title="Temizle">⌫</button>
+        <button class="tbtn" onclick="copyOutput()" title="Kopyala">⎘</button>
+      </div>
+    </div>
+
+    <!-- Quick Action Bar -->
+    <div class="quick-bar">
+      <button class="qbtn qbtn-primary" id="qFormat" onclick="openFormatModal()">
+        <span class="qbtn-icon">⚙</span><span>Format</span>
+      </button>
+      <button class="qbtn" id="qLs"     onclick="runCmd('ls')"     disabled>
+        <span class="qbtn-icon">📂</span><span>ls</span>
+      </button>
+      <button class="qbtn" id="qStatfs" onclick="runCmd('statfs')" disabled>
+        <span class="qbtn-icon">📊</span><span>statfs</span>
+      </button>
+      <button class="qbtn" id="qFsck"   onclick="runCmd('fsck')"   disabled>
+        <span class="qbtn-icon">🔍</span><span>fsck</span>
+      </button>
+      <button class="qbtn" id="qPerf"   onclick="runCmd('perf')"   disabled>
+        <span class="qbtn-icon">⚡</span><span>perf</span>
+      </button>
+      <button class="qbtn qbtn-danger" onclick="doReset()">
+        <span class="qbtn-icon">✕</span><span>Sıfırla</span>
+      </button>
+    </div>
+
+    <!-- Tutorial Banner -->
+    <div class="tutorial-banner" id="tutorialBanner">
+      <div class="tut-header">
+        <span class="tut-icon">📚</span>
+        <strong>Başlangıç Rehberi</strong>
+        <button class="tut-close" onclick="closeTutorial()">✕</button>
+      </div>
+      <div class="tut-steps" id="tutSteps">
+        <div class="tut-step active" id="tut-0">
+          <span class="tut-num">1</span>
+          <span><strong>Format</strong> butonuna tıklayın → disk boyutunu seçin → Formatla</span>
+        </div>
+        <div class="tut-step" id="tut-1">
+          <span class="tut-num">2</span>
+          <span>Terminal'e <code>create dosya.txt</code> yazın veya + butonunu kullanın</span>
+        </div>
+        <div class="tut-step" id="tut-2">
+          <span class="tut-num">3</span>
+          <span>Dosya kartındaki ✏️ ile içerik yazın, 📖 ile okuyun</span>
+        </div>
+        <div class="tut-step" id="tut-3">
+          <span class="tut-num">4</span>
+          <span><code>stat dosya.txt</code> — inode detaylarını görün (timestamp, mode, blok ptrs)</span>
+        </div>
+        <div class="tut-step" id="tut-4">
+          <span class="tut-num">5</span>
+          <span><code>fsck</code> — dosya sistemi tutarlılık kontrolü yapın</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terminal Output -->
+    <div class="term-out" id="termOut" role="log" aria-label="Terminal çıktısı">
+      <div class="term-welcome">
+        <pre class="ascii-art">
+  ╔╦╗╦╔╗╔╦  ╔═╗╔═╗
+  ║║║║║║║║  ╠╣ ╚═╗
+  ╩ ╩╩╝╚╝╩  ╚  ╚═╝</pre>
+        <div class="welcome-sub">Mini Dosya Sistemi Simülatörü · POSIX · pthread · v2.0</div>
+        <div class="welcome-hint">Tip: <kbd>↑↓</kbd> geçmiş · <kbd>Tab</kbd> tamamla · <kbd>?</kbd> yardım · <kbd>Ctrl+L</kbd> temizle</div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="term-inp-row" id="termInpRow">
+      <span class="inp-prompt">mini_fs<span class="inp-sep">$</span></span>
+      <input
+        type="text" id="termInp" class="term-inp"
+        placeholder="komut girin... (ör: create dosya.txt)"
+        autocomplete="off" spellcheck="false" disabled
+        aria-label="Terminal giriş"
+      />
+      <button class="inp-run" id="inpRun" onclick="submitCmd()" disabled title="Çalıştır (Enter)">⏎</button>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Visualization -->
+  <main class="panel panel-viz" id="panelViz">
+
+    <!-- Tab Bar -->
+    <div class="viz-tabs">
+      <button class="vtab active" id="tab-disk" onclick="switchTab('disk')">
+        <span>💾</span> Disk Haritası
+      </button>
+      <button class="vtab" id="tab-inodes" onclick="switchTab('inodes')">
+        <span>⊞</span> İnode Tablosu
+      </button>
+      <button class="vtab" id="tab-files" onclick="switchTab('files')">
+        <span>📁</span> Dosyalar
+      </button>
+      <button class="vtab" id="tab-perf" onclick="switchTab('perf')">
+        <span>⚡</span> Performans
+      </button>
+      <button class="vtab" id="tab-log" onclick="switchTab('log')">
+        <span>📋</span> Log
+      </button>
+    </div>
+
+    <!-- TAB: Disk Map -->
+    <div class="vtab-content active" id="tc-disk">
+      <!-- Superblock Info Cards -->
+      <div class="sb-cards" id="sbCards">
+        <div class="sb-card sb-card-empty">
+          <div class="sb-empty-icon">💾</div>
+          <div>Disk henüz formatlanmadı</div>
+          <div class="sb-empty-hint">Format butonuna tıklayın veya <code>format 1048576 512</code> yazın</div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="disk-legend" id="diskLegend" style="display:none">
+        <div class="leg-item"><span class="leg-dot ld-sb"></span><span>Superblock</span>
+          <button class="leg-info" onclick="showInfo('superblock')">ℹ</button></div>
+        <div class="leg-item"><span class="leg-dot ld-bm"></span><span>Bitmap</span>
+          <button class="leg-info" onclick="showInfo('bitmap')">ℹ</button></div>
+        <div class="leg-item"><span class="leg-dot ld-in"></span><span>İnode</span>
+          <button class="leg-info" onclick="showInfo('inode')">ℹ</button></div>
+        <div class="leg-item"><span class="leg-dot ld-du"></span><span>Dolu Veri</span>
+          <button class="leg-info" onclick="showInfo('data')">ℹ</button></div>
+        <div class="leg-item"><span class="leg-dot ld-df"></span><span>Boş Veri</span></div>
+      </div>
+
+      <!-- Usage Bar -->
+      <div class="usage-wrap" id="usageWrap" style="display:none">
+        <div class="usage-label">
+          <span>Disk Kullanımı</span>
+          <span id="usagePct">0%</span>
+        </div>
+        <div class="usage-track">
+          <div class="usage-fill" id="usageFill"></div>
+        </div>
+        <div class="usage-detail" id="usageDetail"></div>
+      </div>
+
+      <!-- Block Grid -->
+      <div class="block-grid-wrap">
+        <div class="block-grid" id="blockGrid">
+          <div class="grid-empty">
+            <span>💾</span>
+            <span>Disk formatlanmadı</span>
+          </div>
+        </div>
+        <div class="block-tooltip" id="blockTooltip"></div>
+      </div>
+
+      <!-- Hex Viewer -->
+      <div class="hex-viewer" id="hexViewer" style="display:none">
+        <div class="hex-header">
+          <span id="hexTitle">Blok — Hex Görünümü</span>
+          <button class="hex-close" onclick="closeHex()">✕</button>
+        </div>
+        <pre class="hex-content" id="hexContent"></pre>
+      </div>
+    </div>
+
+    <!-- TAB: Inode Table -->
+    <div class="vtab-content" id="tc-inodes">
+      <div class="inode-table-wrap">
+        <div class="inode-table-header">
+          <span class="it-title">İnode Tablosu</span>
+          <span class="it-hint" id="inodeTableHint">— inode yok —</span>
+        </div>
+        <div class="inode-cards" id="inodeCards">
+          <div class="inode-empty">
+            <div>⊞</div>
+            <div>Henüz inode yok</div>
+            <div class="inode-empty-hint">Dosya oluşturun</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Education: inode diagram -->
+      <div class="edu-box" id="inodeEduBox">
+        <div class="edu-title">💡 İnode nedir?</div>
+        <div class="edu-body">
+          Bir <strong>inode</strong> (index node), dosyanın metadata'sını tutar. İsim <em>hariç</em>
+          her şey: boyut, izinler, zaman damgaları, blok işaretçileri. Bu mini_fs'de
+          her inode <code>144 byte</code>'tır ve disk üzerinde birleşik inode bloklarında saklanır.
+          <div class="edu-struct">
+            <div class="edu-field" style="width:28px" title="id: uint32">id</div>
+            <div class="edu-field" style="width:28px" title="size: uint32">sz</div>
+            <div class="edu-field" style="width:14px" title="is_used: uint8">u</div>
+            <div class="edu-field" style="width:21px" title="mode: uint16">mo</div>
+            <div class="edu-field" style="width:128px" title="name[32]">name[32]</div>
+            <div class="edu-field" style="width:64px" title="direct_blocks[16]">blk×16</div>
+            <div class="edu-field" style="width:32px" title="created_at">ctime</div>
+            <div class="edu-field" style="width:32px" title="modified_at">mtime</div>
+            <div class="edu-field" style="width:32px" title="accessed_at">atime</div>
+            <div class="edu-field" style="width:28px" title="link_count + pad">lnk</div>
+          </div>
+          <div class="edu-sizes">
+            <span>uint32=4B</span><span>uint8=1B</span><span>uint16=2B</span>
+            <span>time_t=8B</span><span>char[32]=32B</span><span>uint32[16]=64B</span>
+            <strong>Toplam: 144B</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Files -->
+    <div class="vtab-content" id="tc-files">
+      <div class="files-toolbar">
+        <div class="files-search">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="fileSearch" class="search-inp" placeholder="Dosya ara..." oninput="filterFiles()" disabled/>
+        </div>
+        <div class="files-create">
+          <input type="text" id="newFname" class="create-inp" placeholder="yeni_dosya.txt" disabled/>
+          <button class="create-btn" id="btnCreate" onclick="quickCreate()" disabled>+ Oluştur</button>
+        </div>
+      </div>
+
+      <div class="file-list" id="fileList">
+        <div class="file-list-empty">
+          <div class="fle-icon">📁</div>
+          <div>Henüz dosya yok</div>
+          <div class="fle-hint">Bir dosya oluşturun veya <code>ls</code> çalıştırın</div>
+        </div>
+      </div>
+
+      <!-- Inline write area -->
+      <div class="inline-editor" id="inlineEditor" style="display:none">
+        <div class="ie-header">
+          <span id="ieFilename">📝 dosya.txt</span>
+          <div class="ie-actions-top">
+            <button class="ie-btn" onclick="doInlineWrite()">💾 Kaydet</button>
+            <button class="ie-btn ie-btn-sec" onclick="closeInlineEditor()">İptal</button>
+          </div>
+        </div>
+        <textarea id="ieContent" class="ie-textarea" rows="8" placeholder="İçerik girin..."></textarea>
+        <div class="ie-footer">
+          <span id="ieCharCount">0 karakter</span>
+          <label>
+            <input type="checkbox" id="ieAppend"/> Mevcut içeriğe ekle (append)
+          </label>
+        </div>
+      </div>
+
+      <!-- Inline read area -->
+      <div class="inline-reader" id="inlineReader" style="display:none">
+        <div class="ir-header">
+          <span id="irFilename">📖 dosya.txt</span>
+          <div class="ir-actions">
+            <button class="ie-btn" onclick="copyReadContent()">⎘ Kopyala</button>
+            <button class="ie-btn ie-btn-sec" onclick="closeInlineReader()">✕</button>
+          </div>
+        </div>
+        <pre class="ir-content" id="irContent"></pre>
+      </div>
+    </div>
+
+    <!-- TAB: Performance -->
+    <div class="vtab-content" id="tc-perf">
+      <div class="perf-summary" id="perfSummary">
+        <div class="perf-card">
+          <div class="pc-label">Toplam İşlem</div>
+          <div class="pc-val" id="pc-total">0</div>
+        </div>
+        <div class="perf-card">
+          <div class="pc-label">Toplam Süre</div>
+          <div class="pc-val" id="pc-time">0 µs</div>
+        </div>
+        <div class="perf-card">
+          <div class="pc-label">Ort. Gecikme</div>
+          <div class="pc-val" id="pc-avg">—</div>
+        </div>
+        <div class="perf-card">
+          <div class="pc-label">En Hızlı</div>
+          <div class="pc-val" id="pc-min">—</div>
+        </div>
+        <div class="perf-card">
+          <div class="pc-label">En Yavaş</div>
+          <div class="pc-val" id="pc-max">—</div>
+        </div>
+        <div class="perf-card">
+          <div class="pc-label">Toplam I/O</div>
+          <div class="pc-val" id="pc-bytes">0 B</div>
+        </div>
+      </div>
+
+      <div class="perf-chart-wrap">
+        <div class="perf-chart-title">Son 20 İşlem — Gecikme (µs)</div>
+        <div class="perf-chart" id="perfChart"></div>
+      </div>
+
+      <div class="perf-table-wrap">
+        <table class="perf-table">
+          <thead>
+            <tr>
+              <th>#</th><th>İşlem</th><th>Süre (µs)</th><th>I/O (byte)</th><th>Durum</th>
+            </tr>
+          </thead>
+          <tbody id="perfTableBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Henüz işlem yok</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="perf-edu">
+        <div class="edu-title">💡 Performans ölçümü nasıl çalışır?</div>
+        <div class="edu-body">
+          Her operasyon <code>clock_gettime(CLOCK_MONOTONIC)</code> ile ölçülür — bu POSIX standardı
+          nanosaniye hassasiyetinde monotonic bir saat. UI katmanı simüle edilmiş süreler üretir
+          (gerçek C binary çalıştırıldığında gerçek süreler görürsünüz). Asenkron <strong>logger thread</strong>
+          operasyonları yavaşlatmadan <code>fs.log</code>'a yazar.
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Log -->
+    <div class="vtab-content" id="tc-log">
+      <div class="log-toolbar">
+        <span class="log-title">📋 fs.log (asenkron logger)</span>
+        <div class="log-controls">
+          <button class="log-btn" onclick="clearLog()">Temizle</button>
+          <label class="log-auto">
+            <input type="checkbox" id="logAutoScroll" checked/> Oto-kaydır
+          </label>
+        </div>
+      </div>
+      <div class="log-out" id="logOut">
+        <div class="log-empty">Log henüz boş — işlem yapın</div>
+      </div>
+      <div class="log-edu">
+        <div class="edu-title">💡 Logger Thread Mimarisi</div>
+        <div class="edu-body">
+          <code>logger_init()</code> → <code>pthread_create()</code> ile arka plan thread başlar.
+          Her <code>fs_log()</code> çağrısı mesajı <code>pthread_mutex_lock</code> ile thread-safe bir
+          ring buffer'a ekler ve <code>pthread_cond_signal</code> ile thread'i uyandırır.
+          Thread <code>pwrite()</code> ile diski asenkron yazar → ana thread bloklanmaz.
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ====== MODALS ====== -->
+
+<!-- Format Modal -->
+<div class="modal-bg" id="modalFormat" onclick="closeModalIf(event,'modalFormat')">
+  <div class="modal" role="dialog" aria-label="Disk Formatla">
+    <div class="modal-header">
+      <h2>⚙ Disk Formatla</h2>
+      <button class="modal-x" onclick="closeModal('modalFormat')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="mf-group">
+        <label class="mf-label">Disk boyutu</label>
+        <div class="mf-presets">
+          <button class="mpbtn active" data-field="fmtSize" data-val="1048576"  onclick="setPreset(this)">1 MB</button>
+          <button class="mpbtn"        data-field="fmtSize" data-val="4194304"  onclick="setPreset(this)">4 MB</button>
+          <button class="mpbtn"        data-field="fmtSize" data-val="10485760" onclick="setPreset(this)">10 MB</button>
+          <button class="mpbtn"        data-field="fmtSize" data-val="52428800" onclick="setPreset(this)">50 MB</button>
+        </div>
+        <input type="number" id="fmtSize" class="mf-input" value="1048576" min="4096"/>
+      </div>
+      <div class="mf-group">
+        <label class="mf-label">Blok boyutu</label>
+        <div class="mf-presets">
+          <button class="mpbtn"        data-field="fmtBlock" data-val="256"  onclick="setPreset(this)">256 B</button>
+          <button class="mpbtn active" data-field="fmtBlock" data-val="512"  onclick="setPreset(this)">512 B</button>
+          <button class="mpbtn"        data-field="fmtBlock" data-val="1024" onclick="setPreset(this)">1 KB</button>
+          <button class="mpbtn"        data-field="fmtBlock" data-val="4096" onclick="setPreset(this)">4 KB</button>
+        </div>
+        <input type="number" id="fmtBlock" class="mf-input" value="512" min="144"/>
+      </div>
+      <div class="mf-calc" id="fmtCalc">
+        <span id="calcResult">— hesaplanıyor —</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-primary" onclick="doFormat()">⚙ Formatla</button>
+      <button class="mbtn" onclick="closeModal('modalFormat')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Info Modal -->
+<div class="modal-bg" id="modalInfo" onclick="closeModalIf(event,'modalInfo')">
+  <div class="modal modal-wide" role="dialog">
+    <div class="modal-header">
+      <h2 id="infoTitle">Bilgi</h2>
+      <button class="modal-x" onclick="closeModal('modalInfo')">✕</button>
+    </div>
+    <div class="modal-body" id="infoBody"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-primary" onclick="closeModal('modalInfo')">Tamam</button>
+    </div>
+  </div>
+</div>
+
+<!-- About Modal -->
+<div class="modal-bg" id="modalAbout" onclick="closeModalIf(event,'modalAbout')">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>⬡ mini_fs — Hakkında</h2>
+      <button class="modal-x" onclick="closeModal('modalAbout')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="about-grid">
+        <div class="about-section">
+          <h3>Sistem Programlama Kavramları</h3>
+          <div class="about-tags">
+            <span class="atag">POSIX I/O (open/pread/pwrite)</span>
+            <span class="atag">ftruncate</span>
+            <span class="atag">pthread_create</span>
+            <span class="atag">pthread_mutex_t</span>
+            <span class="atag">pthread_cond_t</span>
+            <span class="atag">clock_gettime (CLOCK_MONOTONIC)</span>
+            <span class="atag">Bitmap Yönetimi</span>
+            <span class="atag">İnode Tablosu</span>
+            <span class="atag">Superblock</span>
+            <span class="atag">Asenkron Loglama</span>
+          </div>
+        </div>
+        <div class="about-section">
+          <h3>Disk Düzeni</h3>
+          <div class="disk-layout-diagram">
+            <div class="dld-block dld-sb">Block 0<br/>Superblock</div>
+            <div class="dld-block dld-bm">Block 1–N<br/>Bitmap</div>
+            <div class="dld-block dld-in">Block N+1–M<br/>İnode Table</div>
+            <div class="dld-block dld-data">Block M+1–END<br/>Data Blocks</div>
+          </div>
+        </div>
+        <div class="about-section">
+          <h3>Komut Seti</h3>
+          <div class="cmd-ref">
+            <div class="cr-row"><code>format &lt;size&gt; &lt;blk&gt;</code><span>Diski formatla</span></div>
+            <div class="cr-row"><code>create &lt;ad&gt;</code><span>Dosya oluştur</span></div>
+            <div class="cr-row"><code>write &lt;ad&gt; "&lt;metin&gt;"</code><span>Üzerine yaz</span></div>
+            <div class="cr-row"><code>append &lt;ad&gt; "&lt;metin&gt;"</code><span>Sonuna ekle</span></div>
+            <div class="cr-row"><code>read &lt;ad&gt;</code><span>Oku</span></div>
+            <div class="cr-row"><code>stat &lt;ad&gt;</code><span>Metadata göster</span></div>
+            <div class="cr-row"><code>rename &lt;eski&gt; &lt;yeni&gt;</code><span>Yeniden adlandır</span></div>
+            <div class="cr-row"><code>cp &lt;src&gt; &lt;dst&gt;</code><span>Kopyala</span></div>
+            <div class="cr-row"><code>chmod &lt;ad&gt; &lt;mod&gt;</code><span>İzin değiştir</span></div>
+            <div class="cr-row"><code>truncate &lt;ad&gt; &lt;n&gt;</code><span>Boyutu kırp</span></div>
+            <div class="cr-row"><code>rm &lt;ad&gt;</code><span>Sil</span></div>
+            <div class="cr-row"><code>ls</code><span>Listele</span></div>
+            <div class="cr-row"><code>statfs</code><span>FS durumu</span></div>
+            <div class="cr-row"><code>fsck</code><span>Tutarlılık kontrolü</span></div>
+            <div class="cr-row"><code>perf</code><span>Performans raporu</span></div>
+            <div class="cr-row"><code>shell</code><span>İnteraktif REPL</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-primary" onclick="closeModal('modalAbout')">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shortcuts Modal -->
+<div class="modal-bg" id="modalShortcuts" onclick="closeModalIf(event,'modalShortcuts')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>⌨ Klavye Kısayolları</h2>
+      <button class="modal-x" onclick="closeModal('modalShortcuts')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="shortcuts-grid">
+        <div class="sc-row"><kbd>Enter</kbd><span>Komutu çalıştır</span></div>
+        <div class="sc-row"><kbd>↑ / ↓</kbd><span>Komut geçmişi</span></div>
+        <div class="sc-row"><kbd>Tab</kbd><span>Otomatik tamamla</span></div>
+        <div class="sc-row"><kbd>Ctrl+L</kbd><span>Terminali temizle</span></div>
+        <div class="sc-row"><kbd>Ctrl+K</kbd><span>Komut paleti</span></div>
+        <div class="sc-row"><kbd>?</kbd><span>Bu pencere</span></div>
+        <div class="sc-row"><kbd>Esc</kbd><span>Modal kapat</span></div>
+        <div class="sc-row"><kbd>1–5</kbd><span>Sekme değiştir</span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-primary" onclick="closeModal('modalShortcuts')">Tamam</button>
+    </div>
+  </div>
+</div>
+
+<!-- Command Palette -->
+<div class="modal-bg" id="modalPalette" onclick="closeModalIf(event,'modalPalette')">
+  <div class="modal palette-modal">
+    <div class="palette-search">
+      <span class="ps-icon">⌘</span>
+      <input type="text" id="paletteInp" class="palette-inp" placeholder="Komut ara..." oninput="filterPalette()"/>
+    </div>
+    <div class="palette-list" id="paletteList"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- Confetti container -->
+<div class="confetti-container" id="confettiContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

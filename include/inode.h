@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-int inode_init_table();
+int inode_init_table(void);
 int inode_allocate(Inode *out_inode);
 int inode_free(uint32_t id);
 int inode_read(uint32_t id, Inode *out_inode);
